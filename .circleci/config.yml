@@ -1,31 +1,26 @@
 version: 2.1
 
-# Không cần orbs nếu chỉ chạy Docker cơ bản
-# (CircleCI orbs dùng cho Python, Heroku... nên bạn có thể bỏ)
-
 jobs:
   run-docker:
     docker:
-      - image: cimg/base:stable  # Ubuntu base có sẵn docker CLI
+      - image: cimg/base:stable
     resource_class: medium
-    parallelism: 20  # 👈 chạy 20 job song song
+    parallelism: 20
+
     steps:
       - checkout
 
+      # 🐳 Kích hoạt môi trường Docker (CircleCI DinD)
+      - setup_remote_docker:
+          version: 20.10.18  # hoặc "default"
+
       - run:
-          name: 🐳 Cài đặt Docker
+          name: 🐳 Pull Docker Image
           command: |
-            sudo apt-get update -y
-            sudo apt-get install -y docker.io
-            sudo systemctl start docker
-            docker --version
+            docker pull nduythanh1/selenium-videozz-multiprocess
 
       - run:
-          name: 🐳 Pull Docker image
-          command: docker pull nduythanh1/selenium-videozz-multiprocess
-
-      - run:
-          name: ▶️ Chạy 3 container song song
+          name: ▶️ Run 3 Containers in Parallel
           command: |
             JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
             echo "🚀 Starting containers for job $JOB_ID..."
@@ -38,14 +33,13 @@ jobs:
             echo "✅ All containers for job $JOB_ID completed."
 
       - run:
-          name: 🧹 Dọn dẹp container
+          name: 🧹 Clean up containers
           when: always
           command: |
             JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
             docker rm -f c1_$JOB_ID c2_$JOB_ID c3_$JOB_ID || true
             docker system prune -f
 
-# 👇 PHẢI có workflows để CircleCI nhận
 workflows:
   version: 2
   run-docker-workflow:
@@ -53,4 +47,4 @@ workflows:
       - run-docker:
           filters:
             branches:
-              only: master  # 👈 chỉ chạy trên nhánh master (hoặc đổi thành main nếu repo bạn dùng main)
+              only: master
