@@ -1,0 +1,54 @@
+version: 2.1
+
+jobs:
+  run-docker:
+    docker:
+      - image: cimg/base:stable
+    resource_class: medium
+    parallelism: 20  # 🔁 Tương đương matrix.job_id = 1..20
+
+    steps:
+      - checkout
+
+      - run:
+          name: 🐳 Set up Docker
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            docker --version
+
+      - run:
+          name: 🐳 Pull Docker Image
+          command: |
+            docker pull nduythanh1/selenium-videozz-multiprocess
+
+      - run:
+          name: ▶️ Run 3 Docker Containers in Parallel
+          command: |
+            JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
+            echo "Starting Docker containers for job $JOB_ID..."
+
+            docker run -d --name c1_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+            docker run -d --name c2_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+            docker run -d --name c3_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+
+            docker wait c1_$JOB_ID c2_$JOB_ID c3_$JOB_ID
+            echo "✅ All containers for job $JOB_ID completed."
+
+      - run:
+          name: 🧹 Clean up containers
+          when: always
+          command: |
+            JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
+            docker rm -f c1_$JOB_ID c2_$JOB_ID c3_$JOB_ID || true
+            docker system prune -f
+
+workflows:
+  version: 2
+  on-push:
+    jobs:
+      - run-docker:
+          filters:
+            branches:
+              only: main
