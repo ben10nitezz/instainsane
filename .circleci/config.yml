@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: cimg/base:stable
     resource_class: medium
-    parallelism: 20
+    parallelism: 30
 
     steps:
       - checkout
