@@ -1,38 +1,56 @@
 version: 2.1
-orbs:
-  python: circleci/python@2.0.3
-  heroku: circleci/heroku@1.2.6
+
+# Không cần orbs nếu chỉ chạy Docker cơ bản
+# (CircleCI orbs dùng cho Python, Heroku... nên bạn có thể bỏ)
 
 jobs:
-  build_and_test: # this can be any name you choose
-    executor: python/default
+  run-docker:
+    docker:
+      - image: cimg/base:stable  # Ubuntu base có sẵn docker CLI
+    resource_class: medium
+    parallelism: 20  # 👈 chạy 20 job song song
     steps:
       - checkout
-      - python/install-packages:
-          pkg-manager: pip
+
       - run:
-          name: Run tests
-          command: python -m pytest
-      - persist_to_workspace:
-          root: ~/project
-          paths:
-            - .
+          name: 🐳 Cài đặt Docker
+          command: |
+            sudo apt-get update -y
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            docker --version
 
-  deploy: # this can be any name you choose
-    executor: heroku/default
-    steps:
-      - attach_workspace:
-          at: ~/project
-      - heroku/deploy-via-git:
-          force: true # force push when pushing to the heroku remote, see: https://devcenter.heroku.com/articles/git
+      - run:
+          name: 🐳 Pull Docker image
+          command: docker pull nduythanh1/selenium-videozz-multiprocess
 
+      - run:
+          name: ▶️ Chạy 3 container song song
+          command: |
+            JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
+            echo "🚀 Starting containers for job $JOB_ID..."
+
+            docker run -d --name c1_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+            docker run -d --name c2_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+            docker run -d --name c3_$JOB_ID -e JOB_ID=$JOB_ID nduythanh1/selenium-videozz-multiprocess
+
+            docker wait c1_$JOB_ID c2_$JOB_ID c3_$JOB_ID
+            echo "✅ All containers for job $JOB_ID completed."
+
+      - run:
+          name: 🧹 Dọn dẹp container
+          when: always
+          command: |
+            JOB_ID=$(expr $CIRCLE_NODE_INDEX + 1)
+            docker rm -f c1_$JOB_ID c2_$JOB_ID c3_$JOB_ID || true
+            docker system prune -f
+
+# 👇 PHẢI có workflows để CircleCI nhận
 workflows:
-  test_my_app:
+  version: 2
+  run-docker-workflow:
     jobs:
-      - build_and_test
-      - deploy:
-          requires:
-            - build_and_test # only deploy if the build_and_test job has completed
+      - run-docker:
           filters:
             branches:
-              only: main # only deploy when on main
+              only: master  # 👈 chỉ chạy trên nhánh master (hoặc đổi thành main nếu repo bạn dùng main)
