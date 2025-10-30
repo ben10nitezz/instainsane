@@ -10,12 +10,13 @@ jobs:
     steps:
       - checkout
 
-      # 🐳 Kích hoạt môi trường Docker (CircleCI DinD)
-      - setup_remote_docker:  # ❌ không cần version cụ thể
+      # 🐳 Kích hoạt Docker daemon của CircleCI
+      - setup_remote_docker
 
       - run:
           name: 🐳 Pull Docker Image
-          command: docker pull nduythanh1/selenium-videozz-multiprocess
+          command: |
+            docker pull nduythanh1/selenium-videozz-multiprocess
 
       - run:
           name: ▶️ Run 3 Containers in Parallel
